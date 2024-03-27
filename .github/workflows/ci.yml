@@ -5,9 +5,6 @@ on:
   push:
     branches:
       - main
-      - '[0-9]+.x'
-    tags:
-      - '*'
     paths-ignore:
       - 'docs/**'
       - '*.md'
@@ -23,7 +20,7 @@ jobs:
 
     strategy:
       matrix:
-        os: [ ubuntu-latest, windows-latest, macos-latest ]
+        os: [ ubuntu-latest ]
 
     steps:
       - name: Checkout
@@ -36,16 +33,13 @@ jobs:
           node-version: 16.x
           cache: 'npm'
 
-      - uses: actions/cache@v4
-        with:
-          path: ~/.npm
-          key: ${{ runner.os }}-node-${{ hashFiles('**/package-lock.json') }}
-          restore-keys: |
-            ${{ runner.os }}-node-
-
       - name: Deps
         run: |
           npm ci
+      - name: format
+        run: |
+          npm run format
+        
 
       - name: Lint
         run: |
@@ -55,74 +49,56 @@ jobs:
       - name: Test
         run: |
           npm run test:ci
-
-      - name: Coverage
-        if: matrix.os == 'ubuntu-latest'
-        uses: codecov/codecov-action@v4
-        timeout-minutes: 5
-        env:
-          CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
-        with:
-          token: ${{ secrets.CODECOV_TOKEN }}
-          verbose: true
-          files: ./coverage/coverage-final.json
-          fail_ci_if_error: false
-
-  release:
-    runs-on: ubuntu-latest
-    if: startsWith(github.ref, 'refs/tags/v')
-    needs:
-      - test
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Use Node
-        id: setup-node
-        uses: actions/setup-node@v4.0.1
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
-        with:
-          node-version: 16.x
-          registry-url: 'https://registry.npmjs.org'
-
-      - uses: actions/cache@v4
-        with:
-          path: ~/.npm
-          key: ${{ runner.os }}-node-${{ hashFiles('**/package-lock.json') }}
-          restore-keys: |
-            ${{ runner.os }}-node-
-
-      - name: Deps
+      
+      - name: Build
         run: |
-          npm ci
+          npm run build
+  terraform_deploy:
+    env:
+      AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+      AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
 
-      - name: Publish
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
-        run: |
-          npm publish --access public
-
-      - name: Release
-        uses: actions/create-release@v1
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        with:
-          tag_name: ${{ github.ref }}
-          release_name: Release ${{ github.ref }}
-          body_path: CHANGELOG.md
-          draft: false
-          prerelease: contains(github.ref, '-')
-
-
-  automerge:
-    needs:
-      - test
     runs-on: ubuntu-latest
-    permissions:
-      pull-requests: write
-      contents: write
+    name: Provision EC2 with Terraform
+    outputs:
+      output1: ${{ steps.ip_address.outputs.ip }}
+
     steps:
-      - uses: fastify/github-action-merge-dependabot@v3.10.1
+      - name: Checkout code
+        uses: actions/checkout@v2
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v1
+        
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v2
         with:
-          github-token: ${{ secrets.GITHUB_TOKEN }}
+          
+          aws-region: "eu-west-1"
+
+      - name: Terraform Init
+        run: terraform init
+
+      - name: terraform destroy
+        run: terraform destroy --auto-approve  
+
+      - name: Terraform Apply
+        run: terraform apply --auto-approve
+      
+      - id: ip_address
+        
+        run: | 
+            terraform-bin output instance_ip |tr "\"" "\0" >ip
+            echo ip=$(cat ip) >> "$GITHUB_OUTPUT" 
+      
+      - name: deploy copy to ec2
+        uses: appleboy/scp-action@v0.1.7
+        with:
+          host: ${{ needs.terraform_deploy.outputs.output1 }}
+          username: ec2-user
+          key: ${{  secrets.SSH_PRIVATE_KEY}}
+          port: 22
+          source: dist/
+          target: App
+       
