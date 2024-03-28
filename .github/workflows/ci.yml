@@ -107,7 +107,7 @@ jobs:
       - name: deploy copy to ec2
         uses: appleboy/scp-action@v0.1.7
         with:
-          host: ${{ needs.terraform_deploy.outputs.output1 }}
+          host: ${{ steps.terraform_deploy.outputs.output1 }}
           username: ec2-user
           key: ${{  secrets.SSH_PRIVATE_KEY}}
           port: 22
