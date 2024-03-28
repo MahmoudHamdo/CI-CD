@@ -34,7 +34,7 @@ jobs:
           cache: 'npm'
       
       - name: Install SSH client and npm 
-        run: sudo apt-get install -y openssh-client pip3 
+        run: sudo apt-get install -y openssh-client  
     
 
       - name: Deps
