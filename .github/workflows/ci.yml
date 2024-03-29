@@ -24,8 +24,7 @@ jobs:
           node-version: 16.x
           cache: 'npm'
       
-      - name: Install SSH client  
-        run: sudo apt-get install -y openssh-client  
+       
     
 
       - name: Deps
@@ -106,4 +105,19 @@ jobs:
           port: 22
           source: dist/
           target: App
+      - name: multiple command
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ steps.ip_address.outputs.ip }}
+          username: ec2-user
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          port: 22
+          script: |
+              sudo yum install nodejs
+              sudo npm install -g pm2
+              cd App/dist
+              sudo npm install
+              sudo pm2 start "PORT=80 node main.js"
+                
+
        
