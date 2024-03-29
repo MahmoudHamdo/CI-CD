@@ -112,10 +112,10 @@ jobs:
           key: ${{ secrets.SSH_PRIVATE_KEY }}
           port: 22
           script: |
-              sudo yum install nodejs
+              sudo yum install nodejs -y
               sudo npm install -g pm2
               cd App/dist
-              sudo npm install
+              sudo npm install 
               sudo pm2 start "PORT=80 node main.js"
                 
 
