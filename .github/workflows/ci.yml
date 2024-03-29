@@ -5,23 +5,14 @@ on:
   push:
     branches:
       - main
-    paths-ignore:
-      - 'docs/**'
-      - '*.md'
-  pull_request:
-    paths-ignore:
-      - 'docs/**'
-      - '*.md'
+   
 
 jobs:
   test:
-    name: Node ${{ matrix.node_version }} - On ${{ matrix.os }}
-    runs-on: ${{ matrix.os }}
+    name: test
+    runs-on: ubuntu-latest 
 
-    strategy:
-      matrix:
-        os: [ ubuntu-latest ]
-
+  
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -33,7 +24,7 @@ jobs:
           node-version: 16.x
           cache: 'npm'
       
-      - name: Install SSH client and npm 
+      - name: Install SSH client  
         run: sudo apt-get install -y openssh-client  
     
 
@@ -57,6 +48,7 @@ jobs:
       - name: Build
         run: |
           npm run build
+          cp package.json dist/
       - name: Upload Artifacts
         uses: actions/upload-artifact@main
         with:
@@ -99,7 +91,7 @@ jobs:
         run: | 
             terraform-bin output instance_ip |tr "\"" "\0" >ip
             echo ip=$(cat ip) >> "$GITHUB_OUTPUT" 
-      - name: Upload Artifacts
+      - name: download Artifacts
         uses: actions/download-artifact@main
         with:
           name: result
